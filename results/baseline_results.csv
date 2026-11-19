@@ -1,0 +1,3 @@
+baseline,accuracy,correct_predictions,total_matches
+random,0.5008350510810526,99861,199389
+higher_ranked_player,0.6204304149175732,123707,199389
