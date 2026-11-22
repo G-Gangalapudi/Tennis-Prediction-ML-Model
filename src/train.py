@@ -1,6 +1,8 @@
+
 """Chronologically train and evaluate the ATP match winner model."""
 
 from pathlib import Path
+from random import Random
 
 import numpy as np
 import pandas as pd
@@ -169,6 +171,40 @@ def _evaluate_split(model, split, split_name):
     }
 
 
+def evaluate_higher_ranked_baseline(test_data, seed=42):
+    """Evaluate the higher-ranked-player baseline on the test set."""
+    rng = Random(seed)
+
+    player1_ranks = pd.to_numeric(
+        test_data["player1_rank"], errors="coerce"
+    )
+    player2_ranks = pd.to_numeric(
+        test_data["player2_rank"], errors="coerce"
+    )
+
+    targets = test_data["target"].to_numpy()
+    correct = 0
+
+    for rank1, rank2, target in zip(
+        player1_ranks, player2_ranks, targets
+    ):
+        if pd.isna(rank1) or pd.isna(rank2) or rank1 == rank2:
+            prediction = rng.choice((0, 1))
+        else:
+            prediction = 1 if rank1 < rank2 else 0
+
+        correct += prediction == target
+
+    total = len(test_data)
+
+    return {
+        "baseline": "higher_ranked_player",
+        "accuracy": correct / total if total else float("nan"),
+        "correct_predictions": correct,
+        "total_matches": total,
+    }
+
+
 def run_training_and_evaluation(data_path=None, results_path=None):
     """Train on the earliest 70% of dates and evaluate on later dates."""
     project_root = Path(__file__).resolve().parents[1]
@@ -234,6 +270,26 @@ def run_training_and_evaluation(data_path=None, results_path=None):
     results_path.parent.mkdir(parents=True, exist_ok=True)
     results.to_csv(results_path, index=False)
     print("Saved evaluation results to {}.".format(results_path))
+
+    baseline_result = evaluate_higher_ranked_baseline(splits["test"])
+
+    print("\nHigher-ranked baseline on test set:")
+    print("Accuracy: {:.4f}".format(baseline_result["accuracy"]))
+    print(
+        "Correct predictions: {}".format(
+            baseline_result["correct_predictions"]
+        )
+    )
+    print("Total matches: {}".format(baseline_result["total_matches"]))
+
+    comparison_path = (
+        project_root / "results" / "test_baseline_comparison.csv"
+    )
+    pd.DataFrame([baseline_result]).to_csv(
+        comparison_path, index=False
+    )
+    print("Saved baseline comparison to {}.".format(comparison_path))
+
     return model, splits, results
 
 
